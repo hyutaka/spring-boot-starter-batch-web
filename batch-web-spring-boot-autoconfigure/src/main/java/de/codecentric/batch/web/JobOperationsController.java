@@ -21,6 +21,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +33,7 @@ import javax.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.batch.core.BatchStatus;
+import org.springframework.batch.core.ExitStatus;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.JobInstance;
@@ -257,6 +259,33 @@ public class JobOperationsController {
 		}
 		JobExecution jobExecution = jobExplorer.getJobExecution(executionId);
 		if (jobExecution != null) {
+			return jobExecution.getExitStatus().getExitCode();
+		} else {
+			throw new NoSuchJobExecutionException("JobExecution with id " + executionId + " not found.");
+		}
+	}
+	
+	@RequestMapping(value = "/jobs/executions/{executionId}/status/{newStatus}", method = RequestMethod.PATCH)
+	public String patchStatus(@PathVariable long executionId, @PathVariable String newStatus) throws NoSuchJobExecutionException {
+		if (LOG.isDebugEnabled()) {
+			LOG.debug("Set ExitCode for JobExecution with id: {} ", executionId);
+		}
+		JobExecution jobExecution = jobExplorer.getJobExecution(executionId);
+		if (jobExecution != null) {
+			jobExecution.getStepExecutions().forEach(step-> {
+				//step.upgradeStatus(BatchStatus.match(newStatus));
+				step.setStatus(BatchStatus.match(newStatus));
+				step.setExitStatus(ExitStatus.FAILED);
+				jobRepository.update(step);
+				//jobRepository.update(jobExecution);
+				});
+			
+			jobExecution.upgradeStatus(BatchStatus.match(newStatus));
+			if (jobExecution.getEndTime() == null)
+				jobExecution.setEndTime(new Date());
+			if ("UNKNOWN".equals(jobExecution.getExitStatus().getExitCode()))
+				jobExecution.setExitStatus(ExitStatus.FAILED);
+			jobRepository.update(jobExecution);
 			return jobExecution.getExitStatus().getExitCode();
 		} else {
 			throw new NoSuchJobExecutionException("JobExecution with id " + executionId + " not found.");

@@ -17,12 +17,15 @@
 package de.codecentric.batch.web;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.batch.core.JobExecution;
+import org.springframework.batch.core.JobInstance;
 import org.springframework.batch.core.explore.JobExplorer;
 import org.springframework.batch.core.launch.JobOperator;
 import org.springframework.batch.core.launch.NoSuchJobExecutionException;
@@ -126,6 +129,27 @@ public class JobMonitoringController {
 			throw new NoSuchJobExecutionException("JobExecution with id " + executionId + " not found.");
 		}
 		return jobExecution;
+	}
+	
+	@RequestMapping(value = "/jobs/instances/{jobName}/{start}/{count}", method = RequestMethod.GET)
+	public List<JobInstance> findExecution(@PathVariable String jobName, @PathVariable int start, @PathVariable int count) throws NoSuchJobExecutionException {
+		List<JobInstance> list = jobExplorer.findJobInstancesByJobName(jobName, start, count);
+		return list;
+	}	
+	
+	@RequestMapping(value = "/jobs/executions/{instanceId}/{start}/{count}", method = RequestMethod.GET)
+	public List<JobExecution> findExecutionsForJobName(@PathVariable long instanceId, @PathVariable int start, @PathVariable int count) {
+		JobInstance jobInstance = jobExplorer.getJobInstance(instanceId);
+		ArrayList<JobExecution> ret = new ArrayList<JobExecution>();
+		int i = 0;
+		for (JobExecution j : jobExplorer.getJobExecutions(jobInstance)) {
+			if ((i >= start) && (i <= start + count))
+				ret.add(j);
+			if (i > start + count) 
+				break;
+			i++;
+		}
+		return ret;
 	}
 
 	@ResponseStatus(HttpStatus.NOT_FOUND)
